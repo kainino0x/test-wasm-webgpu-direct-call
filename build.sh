@@ -4,7 +4,7 @@ set -euo pipefail
 FLAGS=()
 FLAGS+=(--shell-file=shell.html)
 #FLAGS+=(-O0 -g)
-FLAGS+=(-O3 -g0)
+FLAGS+=(-O3 -g2) # -g2 should not add any WASM overhead but keep unminified JS
 #FLAGS+=(-flto) # FIXME: -flto not working with reference types: "invalid relocation data index"
 #FLAGS+=(--closure=1) # probably doesn't affect benchmark, hard to debug
 FLAGS+=(-sUSE_WEBGPU)
