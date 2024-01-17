@@ -127,18 +127,35 @@ void render(wgpu::TextureView view) {
         {
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
             printf("pass id = %zu\n", reinterpret_cast<uintptr_t>(pass.Get()));
-            pass.SetPipeline(pipeline);
 
-            static constexpr int kDrawCount = 10'000'000;
             auto t0 = std::chrono::high_resolution_clock::now();
-            for (int i = 0; i < kDrawCount; ++i) {
+
+            static constexpr int kIterationCount = 10'000'000;
+#if BENCH_MODE_NOOP
+            static constexpr char kDescription[] = "NoOp";
+            for (int i = 0; i < kIterationCount; ++i) {
+                pass.NoOp(1);
+            }
+#elif BENCH_MODE_DRAW
+            static constexpr char kDescription[] = "Draw";
+            pass.SetPipeline(pipeline);
+            for (int i = 0; i < kIterationCount; ++i) {
                 pass.Draw(0);
             }
-            auto t1 = std::chrono::high_resolution_clock::now();
-            printf("duration of %d draws: %lldms\n",
-                kDrawCount, std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+#elif BENCH_MODE_SET_DRAW
+            static constexpr char kDescription[] = "SetPipeline+Draw";
+            for (int i = 0; i < kIterationCount; ++i) {
+                pass.SetPipeline(pipeline);
+                pass.Draw(0);
+            }
+#endif
 
-            pass.End();
+            auto t1 = std::chrono::high_resolution_clock::now();
+            printf("duration of %d %s iterations: %lldms\n",
+                kIterationCount, kDescription,
+                std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
+
+            pass.End(); // This prints the noOpAccumulator just to make sure it's not dead code
         }
         commands = encoder.Finish();
     }
