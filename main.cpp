@@ -131,10 +131,20 @@ void render(wgpu::TextureView view) {
             auto t0 = std::chrono::high_resolution_clock::now();
 
             static constexpr int kIterationCount = 10'000'000;
-#if BENCH_MODE_NOOP
+#if BENCH_MODE_NOOP_NOJS
             static constexpr char kDescription[] = "NoOp";
             for (int i = 0; i < kIterationCount; ++i) {
-                pass.NoOp(1);
+                pass.NoOp_NoJS(1);
+            }
+#elif BENCH_MODE_NOOP_JSBYEXTERNREF
+            static constexpr char kDescription[] = "NoOp";
+            for (int i = 0; i < kIterationCount; ++i) {
+                pass.NoOp_JSByExternref(1);
+            }
+#elif BENCH_MODE_NOOP_JSBYINDEX
+            static constexpr char kDescription[] = "NoOp";
+            for (int i = 0; i < kIterationCount; ++i) {
+                pass.NoOp_JSByIndex(1);
             }
 #elif BENCH_MODE_DRAW
             static constexpr char kDescription[] = "Draw";
