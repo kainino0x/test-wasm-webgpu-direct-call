@@ -74,10 +74,10 @@ if (ENVIRONMENT_IS_NODE) {
  } else if (typeof document != "undefined" && document.currentScript) {
   scriptDirectory = document.currentScript.src;
  }
- if (scriptDirectory.indexOf("blob:") !== 0) {
-  scriptDirectory = scriptDirectory.substr(0, scriptDirectory.replace(/[?#].*/, "").lastIndexOf("/") + 1);
- } else {
+ if (scriptDirectory.startsWith("blob:")) {
   scriptDirectory = "";
+ } else {
+  scriptDirectory = scriptDirectory.substr(0, scriptDirectory.replace(/[?#].*/, "").lastIndexOf("/") + 1);
  }
  {
   read_ = url => {
@@ -286,7 +286,7 @@ function getBinaryPromise(binaryFile) {
     credentials: "same-origin"
    }).then(response => {
     if (!response["ok"]) {
-     throw "failed to load wasm binary file at '" + binaryFile + "'";
+     throw `failed to load wasm binary file at '${binaryFile}'`;
     }
     return response["arrayBuffer"]();
    }).catch(() => getBinarySync(binaryFile));
@@ -1693,7 +1693,7 @@ var _wgpuAdapterRequestDevice = (adapterId, descriptor, callback, userdata) => {
   var requiredFeatureCount = HEAPU32[(((descriptor) + (8)) >> 2)];
   if (requiredFeatureCount) {
    var requiredFeaturesPtr = HEAPU32[(((descriptor) + (12)) >> 2)];
-   desc["requiredFeatures"] = Array.from(HEAP32.subarray((requiredFeaturesPtr) >> 2, (requiredFeaturesPtr + requiredFeaturesCount * 4) >> 2), feature => WebGPU.FeatureName[feature]);
+   desc["requiredFeatures"] = Array.from(HEAP32.subarray((requiredFeaturesPtr) >> 2, (requiredFeaturesPtr + requiredFeatureCount * 4) >> 2), feature => WebGPU.FeatureName[feature]);
   }
   var requiredLimitsPtr = HEAPU32[(((descriptor) + (16)) >> 2)];
   if (requiredLimitsPtr) {

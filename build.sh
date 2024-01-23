@@ -9,6 +9,7 @@ FLAGS+=(-O3 -g2) # -g2 should not add any WASM overhead but keep unminified JS
 #FLAGS+=(--closure=1) # probably doesn't affect benchmark, hard to debug
 FLAGS+=(-sUSE_WEBGPU)
 FLAGS+=(-sREFERENCE_TYPES) # new experimental flag that sets -mreference-types
+#FLAGS+=(-v)
 
 set -x
 
