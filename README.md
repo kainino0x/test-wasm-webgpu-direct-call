@@ -10,6 +10,7 @@ and uses a hack to enable COOP/COEP so that performance.now() won't be coarsened
     - [noop-loop-nojs.html](noop-loop-nojs.html): Calls using externref **without** a JS trampoline
     - [noop-loop-jsbyexternref.html](noop-loop-jsbyexternref.html): Calls using externref **with** a JS trampoline
     - [noop-loop-jsbyindex.html](noop-loop-jsbyindex.html): Calls using the classic style table-lookup JS trampoline
+- [multinoop-jsbyexternref.html](multinoop-jsbyexternref.html): Calls (using externref) into a JS function which calls GPURenderPassEncoder.noOp() in a JS loop
 - [draw-loop.html](draw-loop.html): calls GPURenderPassEncoder.draw() in a tight loop
     - (works on Canary, uses a Wasm Table for GPURenderPassEncoder)
 - [set-draw-loop.html](set-draw-loop.html): calls GPURenderPassEncoder.setPipeline()+.draw() in a tight loop for a slightly more realistic render or compute usage pattern (but should really have setBindGroup() calls too)

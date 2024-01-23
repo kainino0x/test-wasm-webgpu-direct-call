@@ -126,26 +126,30 @@ void render(wgpu::TextureView view) {
         wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
         {
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
-            printf("pass id = %zu\n", reinterpret_cast<uintptr_t>(pass.Get()));
+            WGPURenderPassEncoder cPass = pass.Get();
+            printf("pass id = %zu\n", reinterpret_cast<uintptr_t>(cPass));
 
             auto t0 = std::chrono::high_resolution_clock::now();
 
             static constexpr int kIterationCount = 10'000'000;
 #if BENCH_MODE_NOOP_NOJS
-            static constexpr char kDescription[] = "NoOp";
+            static constexpr char kDescription[] = "NoOp_NoJS";
             for (int i = 0; i < kIterationCount; ++i) {
-                pass.NoOp_NoJS(1);
+                wgpuRenderPassEncoderNoOp_NoJS(cPass, 1);
             }
 #elif BENCH_MODE_NOOP_JSBYEXTERNREF
-            static constexpr char kDescription[] = "NoOp";
+            static constexpr char kDescription[] = "NoOp_JSByExternref";
             for (int i = 0; i < kIterationCount; ++i) {
-                pass.NoOp_JSByExternref(1);
+                wgpuRenderPassEncoderNoOp_JSByExternref(cPass, 1);
             }
 #elif BENCH_MODE_NOOP_JSBYINDEX
-            static constexpr char kDescription[] = "NoOp";
+            static constexpr char kDescription[] = "NoOp_JSByIndex";
             for (int i = 0; i < kIterationCount; ++i) {
-                pass.NoOp_JSByIndex(1);
+                wgpuRenderPassEncoderNoOp_JSByIndex(cPass, 1);
             }
+#elif BENCH_MODE_MULTI_NOOP_JSBYEXTERNREF
+            static constexpr char kDescription[] = "MultiNoOp_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_JSByExternref(cPass, kIterationCount, 1);
 #elif BENCH_MODE_DRAW
             static constexpr char kDescription[] = "Draw";
             pass.SetPipeline(pipeline);
@@ -158,6 +162,8 @@ void render(wgpu::TextureView view) {
                 pass.SetPipeline(pipeline);
                 pass.Draw(0);
             }
+#else
+#    error "Bench mode not set"
 #endif
 
             auto t1 = std::chrono::high_resolution_clock::now();
