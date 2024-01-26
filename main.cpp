@@ -131,34 +131,46 @@ void render(wgpu::TextureView view) {
 
             auto t0 = std::chrono::high_resolution_clock::now();
 
-            static constexpr int kIterationCount = 10'000'000;
-#if BENCH_MODE_NOOP_NOJS
+            static constexpr uint32_t kIterationCount = 10'000'000;
+#if BENCH_MODE_NoOp_NoJS
             static constexpr char kDescription[] = "NoOp_NoJS";
-            for (int i = 0; i < kIterationCount; ++i) {
+            for (uint32_t i = 0; i < kIterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_NoJS(cPass, 1);
             }
-#elif BENCH_MODE_NOOP_JSBYEXTERNREF
+#elif BENCH_MODE_NoOp_JSByExternref
             static constexpr char kDescription[] = "NoOp_JSByExternref";
-            for (int i = 0; i < kIterationCount; ++i) {
+            for (uint32_t i = 0; i < kIterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_JSByExternref(cPass, 1);
             }
-#elif BENCH_MODE_NOOP_JSBYINDEX
+#elif BENCH_MODE_NoOp_JSByIndex
             static constexpr char kDescription[] = "NoOp_JSByIndex";
-            for (int i = 0; i < kIterationCount; ++i) {
+            for (uint32_t i = 0; i < kIterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_JSByIndex(cPass, 1);
             }
-#elif BENCH_MODE_MULTI_NOOP_JSBYEXTERNREF
-            static constexpr char kDescription[] = "MultiNoOp_JSByExternref";
-            wgpuRenderPassEncoderMultiNoOp_JSByExternref(cPass, kIterationCount, 1);
+#elif BENCH_MODE_MultiNoOp_LoopInWasmManyLookup_NoJS
+            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmManyLookup_NoJS";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_NoJS(cPass, kIterationCount, 1);
+#elif BENCH_MODE_MultiNoOp_LoopInWasmManyLookup_JSByExternref
+            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmManyLookup_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_JSByExternref(cPass, kIterationCount, 1);
+#elif BENCH_MODE_MultiNoOp_LoopInWasmSingleLookup_NoJS
+            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmSingleLookup_NoJS";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_NoJS(cPass, kIterationCount, 1);
+#elif BENCH_MODE_MultiNoOp_LoopInWasmSingleLookup_JSByExternref
+            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmSingleLookup_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_JSByExternref(cPass, kIterationCount, 1);
+#elif BENCH_MODE_MultiNoOp_LoopInJS_JSByExternref
+            static constexpr char kDescription[] = "MultiNoOp_LoopInJS_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInJS_JSByExternref(cPass, kIterationCount, 1);
 #elif BENCH_MODE_DRAW
             static constexpr char kDescription[] = "Draw";
             pass.SetPipeline(pipeline);
-            for (int i = 0; i < kIterationCount; ++i) {
+            for (uint32_t i = 0; i < kIterationCount; ++i) {
                 pass.Draw(0);
             }
 #elif BENCH_MODE_SET_DRAW
             static constexpr char kDescription[] = "SetPipeline+Draw";
-            for (int i = 0; i < kIterationCount; ++i) {
+            for (uint32_t i = 0; i < kIterationCount; ++i) {
                 pass.SetPipeline(pipeline);
                 pass.Draw(0);
             }

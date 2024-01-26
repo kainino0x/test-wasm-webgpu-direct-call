@@ -263,7 +263,7 @@ var dataURIPrefix = "data:application/octet-stream;base64,";
 
 var wasmBinaryFile;
 
-wasmBinaryFile = "multinoop-jsbyexternref.wasm";
+wasmBinaryFile = "MultiNoOp_LoopInWasmManyLookup_JSByExternref.wasm";
 
 if (!isDataURI(wasmBinaryFile)) {
  wasmBinaryFile = locateFile(wasmBinaryFile);
@@ -1655,10 +1655,8 @@ var _emwgpuDeviceCreateRenderPipeline = (deviceId, descriptor, idOutPtr) => {
  return pipeline;
 };
 
-var _emwgpuRenderPassEncoderMultiNoOp_JSByExternref = (encoder, times, x) => {
- for (let i = 0; i < times; ++i) {
-  encoder.noOp(x);
- }
+var _emwgpuRenderPassEncoderNoOp_JSByExternref = (encoder, x) => {
+ encoder.noOp(x);
 };
 
 var printCharBuffers = [ null, [], [] ];
@@ -2195,7 +2193,7 @@ var wasmImports = {
  /** @export */ O: _emscripten_set_main_loop,
  /** @export */ N: _emwgpuCommandEncoderBeginRenderPass,
  /** @export */ M: _emwgpuDeviceCreateRenderPipeline,
- /** @export */ L: _emwgpuRenderPassEncoderMultiNoOp_JSByExternref,
+ /** @export */ L: _emwgpuRenderPassEncoderNoOp_JSByExternref,
  /** @export */ b: _fd_write,
  /** @export */ K: _wgpuAdapterRelease,
  /** @export */ J: _wgpuAdapterRequestDevice,
