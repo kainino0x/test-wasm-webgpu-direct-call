@@ -14,6 +14,7 @@ FLAGS+=(-sREFERENCE_TYPES) # new experimental flag that sets -mreference-types
 set -x
 
 emcc --clear-cache
+emcc animometer.cpp -o animometer.html "${FLAGS[@]}" -sINITIAL_MEMORY=400MB
 emcc main.cpp -o noop-loop-nojs.html                                 -DBENCH_MODE_NoOp_NoJS=1                                      "${FLAGS[@]}"
 emcc main.cpp -o noop-loop-jsbyexternref.html                        -DBENCH_MODE_NoOp_JSByExternref=1                             "${FLAGS[@]}"
 emcc main.cpp -o noop-loop-jsbyindex.html                            -DBENCH_MODE_NoOp_JSByIndex=1                                 "${FLAGS[@]}"

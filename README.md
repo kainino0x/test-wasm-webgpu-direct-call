@@ -5,6 +5,10 @@ built with emscripten branch:
 
 and uses a hack to enable COOP/COEP so that performance.now() won't be coarsened.
 
+- [`animometer.html`](animometer.html):
+  A benchmark similar to the WebGL Animometer (but not comparable).
+  Uses draw(), and the setBindGroup() overload which accepts dynamic offsets.
+  GPUBindGroup and HEAPU32 are kept in tables to make that possible.
 - `noop-loop-*`:
   Calls GPURenderPassEncoder.noOp() in a tight loop
   (requires [chrome patch](https://chromium-review.googlesource.com/c/chromium/src/+/5202542)).

@@ -328,10 +328,10 @@ function createWasm() {
  };
  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
   wasmExports = instance.exports;
-  wasmMemory = wasmExports["U"];
+  wasmMemory = wasmExports["V"];
   updateMemoryViews();
-  wasmTable = wasmExports["W"];
-  addOnInit(wasmExports["V"]);
+  wasmTable = wasmExports["X"];
+  addOnInit(wasmExports["W"]);
   removeRunDependency("wasm-instantiate");
   return wasmExports;
  }
@@ -1508,6 +1508,58 @@ var _emwgpuCommandEncoderBeginRenderPass = (encoderId, descriptor, idOutPtr) => 
  return pass;
 };
 
+var readI53FromI64 = ptr => HEAPU32[((ptr) >> 2)] + HEAP32[(((ptr) + (4)) >> 2)] * 4294967296;
+
+var _emwgpuDeviceCreateBindGroup = (deviceId, descriptor, idOutPtr) => {
+ function makeEntry(entryPtr) {
+  var bufferId = HEAPU32[(((entryPtr) + (8)) >> 2)];
+  var samplerId = HEAPU32[(((entryPtr) + (32)) >> 2)];
+  var textureViewId = HEAPU32[(((entryPtr) + (36)) >> 2)];
+  var binding = HEAPU32[(((entryPtr) + (4)) >> 2)];
+  if (bufferId) {
+   var size = readI53FromI64((entryPtr) + (24));
+   if (size == -1) size = undefined;
+   return {
+    "binding": binding,
+    "resource": {
+     "buffer": WebGPU.mgrBuffer.get(bufferId),
+     "offset": HEAPU32[((((entryPtr + 4)) + (16)) >> 2)] * 4294967296 + HEAPU32[(((entryPtr) + (16)) >> 2)],
+     "size": size
+    }
+   };
+  } else if (samplerId) {
+   return {
+    "binding": binding,
+    "resource": WebGPU.mgrSampler.get(samplerId)
+   };
+  } else {
+   return {
+    "binding": binding,
+    "resource": WebGPU.mgrTextureView.get(textureViewId)
+   };
+  }
+ }
+ function makeEntries(count, entriesPtrs) {
+  var entries = [];
+  for (var i = 0; i < count; ++i) {
+   entries.push(makeEntry(entriesPtrs + 40 * i));
+  }
+  return entries;
+ }
+ var desc = {
+  "label": undefined,
+  "layout": WebGPU.mgrBindGroupLayout.get(HEAPU32[(((descriptor) + (8)) >> 2)]),
+  "entries": makeEntries(HEAPU32[(((descriptor) + (12)) >> 2)], HEAPU32[(((descriptor) + (16)) >> 2)])
+ };
+ var labelPtr = HEAPU32[(((descriptor) + (4)) >> 2)];
+ if (labelPtr) desc["label"] = UTF8ToString(labelPtr);
+ var device = WebGPU.mgrDevice.get(deviceId);
+ var bindGroup = device["createBindGroup"](desc);
+ var id = WebGPU.mgrBindGroup.create(bindGroup);
+ HEAP32[((idOutPtr) >> 2)] = id;
+ return bindGroup;
+};
+
 var generateRenderPipelineDesc = descriptor => {
  function makePrimitiveState(rsPtr) {
   if (!rsPtr) return undefined;
@@ -1655,6 +1707,8 @@ var _emwgpuDeviceCreateRenderPipeline = (deviceId, descriptor, idOutPtr) => {
  return pipeline;
 };
 
+var _emwgpuGetHEAPU32 = () => HEAPU32;
+
 var _emwgpuRenderPassEncoderNoOp_NoJS = Function.prototype.call.bind(GPURenderPassEncoder.prototype.noOp);
 
 var printCharBuffers = [ null, [], [] ];
@@ -1794,55 +1848,6 @@ var _wgpuCommandEncoderFinish = (encoderId, descriptor) => {
 };
 
 var _wgpuCommandEncoderRelease = id => WebGPU.mgrCommandEncoder.release(id);
-
-var readI53FromI64 = ptr => HEAPU32[((ptr) >> 2)] + HEAP32[(((ptr) + (4)) >> 2)] * 4294967296;
-
-var _wgpuDeviceCreateBindGroup = (deviceId, descriptor) => {
- function makeEntry(entryPtr) {
-  var bufferId = HEAPU32[(((entryPtr) + (8)) >> 2)];
-  var samplerId = HEAPU32[(((entryPtr) + (32)) >> 2)];
-  var textureViewId = HEAPU32[(((entryPtr) + (36)) >> 2)];
-  var binding = HEAPU32[(((entryPtr) + (4)) >> 2)];
-  if (bufferId) {
-   var size = readI53FromI64((entryPtr) + (24));
-   if (size == -1) size = undefined;
-   return {
-    "binding": binding,
-    "resource": {
-     "buffer": WebGPU.mgrBuffer.get(bufferId),
-     "offset": HEAPU32[((((entryPtr + 4)) + (16)) >> 2)] * 4294967296 + HEAPU32[(((entryPtr) + (16)) >> 2)],
-     "size": size
-    }
-   };
-  } else if (samplerId) {
-   return {
-    "binding": binding,
-    "resource": WebGPU.mgrSampler.get(samplerId)
-   };
-  } else {
-   return {
-    "binding": binding,
-    "resource": WebGPU.mgrTextureView.get(textureViewId)
-   };
-  }
- }
- function makeEntries(count, entriesPtrs) {
-  var entries = [];
-  for (var i = 0; i < count; ++i) {
-   entries.push(makeEntry(entriesPtrs + 40 * i));
-  }
-  return entries;
- }
- var desc = {
-  "label": undefined,
-  "layout": WebGPU.mgrBindGroupLayout.get(HEAPU32[(((descriptor) + (8)) >> 2)]),
-  "entries": makeEntries(HEAPU32[(((descriptor) + (12)) >> 2)], HEAPU32[(((descriptor) + (16)) >> 2)])
- };
- var labelPtr = HEAPU32[(((descriptor) + (4)) >> 2)];
- if (labelPtr) desc["label"] = UTF8ToString(labelPtr);
- var device = WebGPU.mgrDevice.get(deviceId);
- return WebGPU.mgrBindGroup.create(device["createBindGroup"](desc));
-};
 
 var _wgpuDeviceCreateBindGroupLayout = (deviceId, descriptor) => {
  function makeBufferEntry(entryPtr) {
@@ -2183,25 +2188,26 @@ WebGPU.initManagers();
 
 var wasmImports = {
  /** @export */ a: ___assert_fail,
- /** @export */ T: __emscripten_get_now_is_monotonic,
- /** @export */ S: _abort,
- /** @export */ R: _emscripten_get_now,
- /** @export */ Q: _emscripten_memcpy_js,
- /** @export */ P: _emscripten_resize_heap,
- /** @export */ O: _emscripten_set_main_loop,
- /** @export */ N: _emwgpuCommandEncoderBeginRenderPass,
+ /** @export */ U: __emscripten_get_now_is_monotonic,
+ /** @export */ T: _abort,
+ /** @export */ S: _emscripten_get_now,
+ /** @export */ R: _emscripten_memcpy_js,
+ /** @export */ Q: _emscripten_resize_heap,
+ /** @export */ P: _emscripten_set_main_loop,
+ /** @export */ O: _emwgpuCommandEncoderBeginRenderPass,
+ /** @export */ N: _emwgpuDeviceCreateBindGroup,
  /** @export */ M: _emwgpuDeviceCreateRenderPipeline,
- /** @export */ L: _emwgpuRenderPassEncoderNoOp_NoJS,
+ /** @export */ L: _emwgpuGetHEAPU32,
+ /** @export */ K: _emwgpuRenderPassEncoderNoOp_NoJS,
  /** @export */ b: _fd_write,
- /** @export */ K: _wgpuAdapterRelease,
- /** @export */ J: _wgpuAdapterRequestDevice,
- /** @export */ I: _wgpuBindGroupLayoutReference,
- /** @export */ H: _wgpuBindGroupLayoutRelease,
- /** @export */ G: _wgpuBindGroupRelease,
- /** @export */ F: _wgpuCommandBufferRelease,
- /** @export */ E: _wgpuCommandEncoderFinish,
- /** @export */ D: _wgpuCommandEncoderRelease,
- /** @export */ C: _wgpuDeviceCreateBindGroup,
+ /** @export */ J: _wgpuAdapterRelease,
+ /** @export */ I: _wgpuAdapterRequestDevice,
+ /** @export */ H: _wgpuBindGroupLayoutReference,
+ /** @export */ G: _wgpuBindGroupLayoutRelease,
+ /** @export */ F: _wgpuBindGroupRelease,
+ /** @export */ E: _wgpuCommandBufferRelease,
+ /** @export */ D: _wgpuCommandEncoderFinish,
+ /** @export */ C: _wgpuCommandEncoderRelease,
  /** @export */ B: _wgpuDeviceCreateBindGroupLayout,
  /** @export */ A: _wgpuDeviceCreateCommandEncoder,
  /** @export */ z: _wgpuDeviceCreatePipelineLayout,
@@ -2232,21 +2238,21 @@ var wasmImports = {
 
 var wasmExports = createWasm();
 
-var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["V"])();
+var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["W"])();
 
-var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["X"])(a0, a1);
+var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["Y"])(a0, a1);
 
-var _malloc = a0 => (_malloc = wasmExports["Y"])(a0);
+var _malloc = a0 => (_malloc = wasmExports["Z"])(a0);
 
-var _free = a0 => (_free = wasmExports["Z"])(a0);
+var _free = a0 => (_free = wasmExports["_"])(a0);
 
 var _memalign = (a0, a1) => (_memalign = wasmExports["memalign"])(a0, a1);
 
-var stackSave = () => (stackSave = wasmExports["_"])();
+var stackSave = () => (stackSave = wasmExports["$"])();
 
-var stackRestore = a0 => (stackRestore = wasmExports["$"])(a0);
+var stackRestore = a0 => (stackRestore = wasmExports["aa"])(a0);
 
-var stackAlloc = a0 => (stackAlloc = wasmExports["aa"])(a0);
+var stackAlloc = a0 => (stackAlloc = wasmExports["ba"])(a0);
 
 var calledRun;
 

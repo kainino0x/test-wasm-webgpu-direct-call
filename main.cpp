@@ -98,12 +98,14 @@ void init() {
 
         wgpu::FragmentState fragmentState{};
         fragmentState.module = shaderModule;
+        fragmentState.entryPoint = "main_f";
         fragmentState.targetCount = 1;
         fragmentState.targets = &colorTargetState;
 
         wgpu::RenderPipelineDescriptor descriptor{};
         descriptor.layout = device.CreatePipelineLayout(&pl);
         descriptor.vertex.module = shaderModule;
+        descriptor.vertex.entryPoint = "main_v";
         descriptor.fragment = &fragmentState;
         descriptor.primitive.topology = wgpu::PrimitiveTopology::TriangleList;
         pipeline = device.CreateRenderPipeline(&descriptor);
