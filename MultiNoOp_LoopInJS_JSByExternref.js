@@ -328,10 +328,10 @@ function createWasm() {
  };
  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
   wasmExports = instance.exports;
-  wasmMemory = wasmExports["V"];
+  wasmMemory = wasmExports["W"];
   updateMemoryViews();
-  wasmTable = wasmExports["X"];
-  addOnInit(wasmExports["W"]);
+  wasmTable = wasmExports["Y"];
+  addOnInit(wasmExports["X"]);
   removeRunDependency("wasm-instantiate");
   return wasmExports;
  }
@@ -354,6 +354,16 @@ function createWasm() {
 var tempDouble;
 
 var tempI64;
+
+var ASM_CONSTS = {
+ 2902: () => {
+  const iterations = new URLSearchParams(window.location.search).get("iterations");
+  if (!iterations) {
+   window.location.search = "?iterations=10000000";
+  }
+  return iterations;
+ }
+};
 
 /** @constructor */ function ExitStatus(status) {
  this.name = "ExitStatus";
@@ -441,6 +451,28 @@ var __emscripten_get_now_is_monotonic = () => nowIsMonotonic;
 var _abort = () => {
  abort("");
 };
+
+var readEmAsmArgsArray = [];
+
+var readEmAsmArgs = (sigPtr, buf) => {
+ readEmAsmArgsArray.length = 0;
+ var ch;
+ while (ch = HEAPU8[sigPtr++]) {
+  var wide = (ch != 105);
+  wide &= (ch != 112);
+  buf += wide && (buf % 8) ? 4 : 0;
+  readEmAsmArgsArray.push(ch == 112 ? HEAPU32[((buf) >> 2)] : ch == 105 ? HEAP32[((buf) >> 2)] : HEAPF64[((buf) >> 3)]);
+  buf += wide ? 8 : 4;
+ }
+ return readEmAsmArgsArray;
+};
+
+var runEmAsmFunction = (code, sigPtr, argbuf) => {
+ var args = readEmAsmArgs(sigPtr, argbuf);
+ return ASM_CONSTS[code].apply(null, args);
+};
+
+var _emscripten_asm_const_int = (code, sigPtr, argbuf) => runEmAsmFunction(code, sigPtr, argbuf);
 
 var _emscripten_get_now;
 
@@ -2192,8 +2224,9 @@ WebGPU.initManagers();
 
 var wasmImports = {
  /** @export */ a: ___assert_fail,
- /** @export */ U: __emscripten_get_now_is_monotonic,
- /** @export */ T: _abort,
+ /** @export */ V: __emscripten_get_now_is_monotonic,
+ /** @export */ U: _abort,
+ /** @export */ T: _emscripten_asm_const_int,
  /** @export */ S: _emscripten_get_now,
  /** @export */ R: _emscripten_memcpy_js,
  /** @export */ Q: _emscripten_resize_heap,
@@ -2242,21 +2275,25 @@ var wasmImports = {
 
 var wasmExports = createWasm();
 
-var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["W"])();
+var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["X"])();
 
-var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["Y"])(a0, a1);
+var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["Z"])(a0, a1);
 
-var _malloc = a0 => (_malloc = wasmExports["Z"])(a0);
+var _malloc = a0 => (_malloc = wasmExports["_"])(a0);
 
-var _free = a0 => (_free = wasmExports["_"])(a0);
+var _free = a0 => (_free = wasmExports["$"])(a0);
 
 var _memalign = (a0, a1) => (_memalign = wasmExports["memalign"])(a0, a1);
 
-var stackSave = () => (stackSave = wasmExports["$"])();
+var stackSave = () => (stackSave = wasmExports["aa"])();
 
-var stackRestore = a0 => (stackRestore = wasmExports["aa"])(a0);
+var stackRestore = a0 => (stackRestore = wasmExports["ba"])(a0);
 
-var stackAlloc = a0 => (stackAlloc = wasmExports["ba"])(a0);
+var stackAlloc = a0 => (stackAlloc = wasmExports["ca"])(a0);
+
+var ___start_em_js = Module["___start_em_js"] = 2548;
+
+var ___stop_em_js = Module["___stop_em_js"] = 2902;
 
 var calledRun;
 

@@ -208,34 +208,19 @@ wgpu::SwapChain swapChain;
 const uint32_t kWidth = 640;
 const uint32_t kHeight = 480;
 
-EM_JS(bool, renderInJSIfEnabled, (WGPUDevice deviceId, WGPUTextureView viewId, WGPURenderPipeline pipelineId, WGPUBindGroup bindGroupId,
-    size_t numTriangles, size_t sizeofShaderData), {
+EM_JS(bool, renderInJSIfEnabled, (WGPURenderPassEncoder passId, WGPUBindGroup bindGroupId, size_t numTriangles, size_t sizeofShaderData), {
     if (!jsModeCheckbox.checked) {
         return false;
     }
-    const device = WebGPU.mgrDevice.get(deviceId);
-    const view = WebGPU.mgrTextureView.get(viewId);
-    const pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+    const pass = WebGPU.mgrRenderPassEncoder.get(passId);
     const bindGroup = WebGPU.mgrBindGroup.get(bindGroupId);
 
-    const dynamicOffset = new Uint32Array(1);
-    const encoder = device.createCommandEncoder();
-    {
-        const pass = encoder.beginRenderPass({
-            colorAttachments: [
-                { view: view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] },
-            ],
-        });
-        pass.setPipeline(pipeline);
-        for (let i = 0; i < numTriangles; ++i) {
-            // Call using the Uint32Array overload to match the C++ code.
-            dynamicOffset[0] = i * sizeofShaderData;
-            pass.setBindGroup(0, bindGroup, dynamicOffset, 0, 1);
-            pass.draw(3);
-        }
-        pass.end();
+    for (let i = 0; i < numTriangles; ++i) {
+        // Call using the Uint32Array overload to match the C++ code.
+        dynamicOffsetArrayForJS[0] = i * sizeofShaderData;
+        pass.setBindGroup(0, bindGroup, dynamicOffsetArrayForJS, 0, 1);
+        pass.draw(3);
     }
-    device.queue.submit([encoder.finish()]);
 
     return true;
 });
@@ -245,46 +230,45 @@ int frameCount = 0;
 int lastTimePrint = 0;
 bool lastRenderedInJS;
 void frame() {
-    wgpu::TextureView view = swapChain.GetCurrentTextureView();
-
     for (auto& data : shaderData) {
         data.time = frameCount / 60.0f;
     }
     queue.WriteBuffer(ubo, 0, shaderData.data(), numTriangles * sizeof(ShaderData));
 
-    bool renderedInJS = renderInJSIfEnabled(device.Get(), view.Get(), pipeline.Get(), bindGroup.Get(), numTriangles, sizeof(ShaderData));
-    if (!renderedInJS) {
-        wgpu::RenderPassColorAttachment attachment{};
-        attachment.view = view;
-        attachment.loadOp = wgpu::LoadOp::Clear;
-        attachment.storeOp = wgpu::StoreOp::Store;
-        attachment.clearValue = {0, 0, 0, 1};
+    wgpu::TextureView view = swapChain.GetCurrentTextureView();
+    wgpu::RenderPassColorAttachment attachment{};
+    attachment.view = view;
+    attachment.loadOp = wgpu::LoadOp::Clear;
+    attachment.storeOp = wgpu::StoreOp::Store;
+    attachment.clearValue = {0, 0, 0, 1};
 
-        wgpu::RenderPassDescriptor renderpass{};
-        renderpass.colorAttachmentCount = 1;
-        renderpass.colorAttachments = &attachment;
+    wgpu::RenderPassDescriptor renderpass{};
+    renderpass.colorAttachmentCount = 1;
+    renderpass.colorAttachments = &attachment;
 
-        wgpu::CommandBuffer commands;
-        {
-            wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
-            {
-                wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
-                pass.SetPipeline(pipeline);
-                for (size_t i = 0; i < numTriangles; i++) {
-                    uint32_t offset = i * sizeof(ShaderData);
-                    pass.SetBindGroup(0, bindGroup, 1, &offset);
-                    pass.Draw(3);
-                }
-                pass.End();
+    bool renderedInJS;
+    wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+    {
+        wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
+        pass.SetPipeline(pipeline);
+
+        renderedInJS = renderInJSIfEnabled(pass.Get(), bindGroup.Get(), numTriangles, sizeof(ShaderData));
+        if (!renderedInJS) {
+            for (size_t i = 0; i < numTriangles; i++) {
+                uint32_t offset = i * sizeof(ShaderData);
+                pass.SetBindGroup(0, bindGroup, 1, &offset);
+                pass.Draw(3);
             }
-            commands = encoder.Finish();
         }
 
+        pass.End();
+        wgpu::CommandBuffer commands = encoder.Finish();
         queue.Submit(1, &commands);
     }
 
     auto t = std::chrono::high_resolution_clock::now();
     if (frameCount == 0 || renderedInJS != lastRenderedInJS) {
+        lastTimePrint = frameCount;
         t0 = t;
     } else {
         double micros = std::chrono::duration_cast<std::chrono::microseconds>(t - t0).count();
@@ -334,6 +318,8 @@ int main() {
         jsModeCheckbox.type = 'checkbox';
         label.append(jsModeCheckbox);
         label.append('Render using JS (unchecked = Wasm)');
+
+        globalThis.dynamicOffsetArrayForJS = new Uint32Array(1);
     });
     numTriangles = EM_ASM_INT({
         const triangles = new URLSearchParams(window.location.search).get('triangles');

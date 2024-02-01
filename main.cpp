@@ -54,6 +54,7 @@ static const char shaderCode[] = R"(
 static wgpu::Device device;
 static wgpu::Queue queue;
 static wgpu::RenderPipeline pipeline;
+static uint32_t iterationCount = 0;
 
 void init() {
     device.SetUncapturedErrorCallback(
@@ -112,6 +113,21 @@ void init() {
     }
 }
 
+EM_JS(bool, renderInJSIfEnabled, (WGPURenderPassEncoder passId, WGPURenderPipeline pipelineId, uint32_t iterationCount), {
+    if (!jsModeCheckbox.checked) {
+        return false;
+    }
+    const pass = WebGPU.mgrRenderPassEncoder.get(passId);
+    const pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+
+    for (let i = 0; i < iterationCount; ++i) {
+        pass.setPipeline(pipeline);
+        pass.draw(3);
+    }
+
+    return true;
+});
+
 void render(wgpu::TextureView view) {
     wgpu::RenderPassColorAttachment attachment{};
     attachment.view = view;
@@ -133,48 +149,53 @@ void render(wgpu::TextureView view) {
 
             auto t0 = std::chrono::high_resolution_clock::now();
 
-            static constexpr uint32_t kIterationCount = 10'000'000;
 #if BENCH_MODE_NoOp_NoJS
-            static constexpr char kDescription[] = "NoOp_NoJS";
-            for (uint32_t i = 0; i < kIterationCount; ++i) {
+            const char* description = "NoOp_NoJS";
+            for (uint32_t i = 0; i < iterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_NoJS(cPass, 1);
             }
 #elif BENCH_MODE_NoOp_JSByExternref
-            static constexpr char kDescription[] = "NoOp_JSByExternref";
-            for (uint32_t i = 0; i < kIterationCount; ++i) {
+            const char* description = "NoOp_JSByExternref";
+            for (uint32_t i = 0; i < iterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_JSByExternref(cPass, 1);
             }
 #elif BENCH_MODE_NoOp_JSByIndex
-            static constexpr char kDescription[] = "NoOp_JSByIndex";
-            for (uint32_t i = 0; i < kIterationCount; ++i) {
+            const char* description = "NoOp_JSByIndex";
+            for (uint32_t i = 0; i < iterationCount; ++i) {
                 wgpuRenderPassEncoderNoOp_JSByIndex(cPass, 1);
             }
 #elif BENCH_MODE_MultiNoOp_LoopInWasmManyLookup_NoJS
-            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmManyLookup_NoJS";
-            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_NoJS(cPass, kIterationCount, 1);
+            const char* description = "MultiNoOp_LoopInWasmManyLookup_NoJS";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_NoJS(cPass, iterationCount, 1);
 #elif BENCH_MODE_MultiNoOp_LoopInWasmManyLookup_JSByExternref
-            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmManyLookup_JSByExternref";
-            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_JSByExternref(cPass, kIterationCount, 1);
+            const char* description = "MultiNoOp_LoopInWasmManyLookup_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmManyLookup_JSByExternref(cPass, iterationCount, 1);
 #elif BENCH_MODE_MultiNoOp_LoopInWasmSingleLookup_NoJS
-            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmSingleLookup_NoJS";
-            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_NoJS(cPass, kIterationCount, 1);
+            const char* description = "MultiNoOp_LoopInWasmSingleLookup_NoJS";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_NoJS(cPass, iterationCount, 1);
 #elif BENCH_MODE_MultiNoOp_LoopInWasmSingleLookup_JSByExternref
-            static constexpr char kDescription[] = "MultiNoOp_LoopInWasmSingleLookup_JSByExternref";
-            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_JSByExternref(cPass, kIterationCount, 1);
+            const char* description = "MultiNoOp_LoopInWasmSingleLookup_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInWasmSingleLookup_JSByExternref(cPass, iterationCount, 1);
 #elif BENCH_MODE_MultiNoOp_LoopInJS_JSByExternref
-            static constexpr char kDescription[] = "MultiNoOp_LoopInJS_JSByExternref";
-            wgpuRenderPassEncoderMultiNoOp_LoopInJS_JSByExternref(cPass, kIterationCount, 1);
+            const char* description = "MultiNoOp_LoopInJS_JSByExternref";
+            wgpuRenderPassEncoderMultiNoOp_LoopInJS_JSByExternref(cPass, iterationCount, 1);
 #elif BENCH_MODE_DRAW
-            static constexpr char kDescription[] = "Draw";
+            const char* description = "Draw";
             pass.SetPipeline(pipeline);
-            for (uint32_t i = 0; i < kIterationCount; ++i) {
-                pass.Draw(0);
+            for (uint32_t i = 0; i < iterationCount; ++i) {
+                pass.Draw(3);
             }
 #elif BENCH_MODE_SET_DRAW
-            static constexpr char kDescription[] = "SetPipeline+Draw";
-            for (uint32_t i = 0; i < kIterationCount; ++i) {
-                pass.SetPipeline(pipeline);
-                pass.Draw(0);
+            const char* description = nullptr;
+            bool renderedInJS = renderInJSIfEnabled(pass.Get(), pipeline.Get(), iterationCount);
+            if (renderedInJS) {
+                description = "SetPipeline+Draw (JS)";
+            } else {
+                description = "SetPipeline+Draw (Wasm)";
+                for (uint32_t i = 0; i < iterationCount; ++i) {
+                    pass.SetPipeline(pipeline);
+                    pass.Draw(3);
+                }
             }
 #else
 #    error "Bench mode not set"
@@ -182,7 +203,7 @@ void render(wgpu::TextureView view) {
 
             auto t1 = std::chrono::high_resolution_clock::now();
             printf("duration of %d %s iterations: %lldms\n",
-                kIterationCount, kDescription,
+                iterationCount, description,
                 std::chrono::duration_cast<std::chrono::milliseconds>(t1 - t0).count());
 
             pass.End(); // This prints the noOpAccumulator just to make sure it's not dead code
@@ -224,6 +245,26 @@ void run() {
 }
 
 int main() {
+#if BENCH_MODE_SET_DRAW
+    EM_ASM({
+        const label = document.createElement('label');
+        document.body.append(label);
+
+        globalThis.jsModeCheckbox = document.createElement('input');
+        jsModeCheckbox.type = 'checkbox';
+        label.append(jsModeCheckbox);
+        label.append('Render using JS (unchecked = Wasm)');
+    });
+#endif
+    iterationCount = EM_ASM_INT({
+        const iterations = new URLSearchParams(window.location.search).get('iterations');
+        if (!iterations) {
+            // Redirect
+            window.location.search = '?iterations=10000000';
+        }
+        return iterations;
+    });
+
     GetDevice([](wgpu::Device dev) {
         device = dev;
         run();

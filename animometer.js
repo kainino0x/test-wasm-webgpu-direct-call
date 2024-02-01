@@ -356,15 +356,16 @@ var tempDouble;
 var tempI64;
 
 var ASM_CONSTS = {
- 5396: () => {
+ 4953: () => {
   const label = document.createElement("label");
   document.body.append(label);
   globalThis.jsModeCheckbox = document.createElement("input");
   jsModeCheckbox.type = "checkbox";
   label.append(jsModeCheckbox);
   label.append("Render using JS (unchecked = Wasm)");
+  globalThis.dynamicOffsetArrayForJS = new Uint32Array(1);
  },
- 5653: () => {
+ 5267: () => {
   const triangles = new URLSearchParams(window.location.search).get("triangles");
   if (!triangles) {
    window.location.search = "?triangles=100000";
@@ -373,34 +374,17 @@ var ASM_CONSTS = {
  }
 };
 
-function renderInJSIfEnabled(deviceId, viewId, pipelineId, bindGroupId, numTriangles, sizeofShaderData) {
+function renderInJSIfEnabled(passId, bindGroupId, numTriangles, sizeofShaderData) {
  if (!jsModeCheckbox.checked) {
   return false;
  }
- const device = WebGPU.mgrDevice.get(deviceId);
- const view = WebGPU.mgrTextureView.get(viewId);
- const pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+ const pass = WebGPU.mgrRenderPassEncoder.get(passId);
  const bindGroup = WebGPU.mgrBindGroup.get(bindGroupId);
- const dynamicOffset = new Uint32Array(1);
- const encoder = device.createCommandEncoder();
- {
-  const pass = encoder.beginRenderPass({
-   colorAttachments: [ {
-    view: view,
-    loadOp: "clear",
-    storeOp: "store",
-    clearValue: [ 0, 0, 0, 1 ]
-   } ]
-  });
-  pass.setPipeline(pipeline);
-  for (let i = 0; i < numTriangles; ++i) {
-   dynamicOffset[0] = i * sizeofShaderData;
-   pass.setBindGroup(0, bindGroup, dynamicOffset, 0, 1);
-   pass.draw(3);
-  }
-  pass.end();
+ for (let i = 0; i < numTriangles; ++i) {
+  dynamicOffsetArrayForJS[0] = i * sizeofShaderData;
+  pass.setBindGroup(0, bindGroup, dynamicOffsetArrayForJS, 0, 1);
+  pass.draw(3);
  }
- device.queue.submit([ encoder.finish() ]);
  return true;
 }
 
@@ -2450,7 +2434,7 @@ var ___cxa_is_pointer_type = a0 => (___cxa_is_pointer_type = wasmExports["oa"])(
 
 var ___start_em_js = Module["___start_em_js"] = 4500;
 
-var ___stop_em_js = Module["___stop_em_js"] = 5396;
+var ___stop_em_js = Module["___stop_em_js"] = 4953;
 
 var calledRun;
 
