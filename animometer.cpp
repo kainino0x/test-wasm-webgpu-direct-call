@@ -208,9 +208,42 @@ wgpu::SwapChain swapChain;
 const uint32_t kWidth = 640;
 const uint32_t kHeight = 480;
 
+EM_JS(bool, renderInJSIfEnabled, (WGPUDevice deviceId, WGPUTextureView viewId, WGPURenderPipeline pipelineId, WGPUBindGroup bindGroupId,
+    size_t numTriangles, size_t sizeofShaderData), {
+    if (!jsModeCheckbox.checked) {
+        return false;
+    }
+    const device = WebGPU.mgrDevice.get(deviceId);
+    const view = WebGPU.mgrTextureView.get(viewId);
+    const pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+    const bindGroup = WebGPU.mgrBindGroup.get(bindGroupId);
+
+    const dynamicOffset = new Uint32Array(1);
+    const encoder = device.createCommandEncoder();
+    {
+        const pass = encoder.beginRenderPass({
+            colorAttachments: [
+                { view: view, loadOp: 'clear', storeOp: 'store', clearValue: [0, 0, 0, 1] },
+            ],
+        });
+        pass.setPipeline(pipeline);
+        for (let i = 0; i < numTriangles; ++i) {
+            // Call using the Uint32Array overload to match the C++ code.
+            dynamicOffset[0] = i * sizeofShaderData;
+            pass.setBindGroup(0, bindGroup, dynamicOffset, 0, 1);
+            pass.draw(3);
+        }
+        pass.end();
+    }
+    device.queue.submit([encoder.finish()]);
+
+    return true;
+});
+
 std::chrono::time_point<std::chrono::high_resolution_clock> t0;
 int frameCount = 0;
 int lastTimePrint = 0;
+bool lastRenderedInJS;
 void frame() {
     wgpu::TextureView view = swapChain.GetCurrentTextureView();
 
@@ -219,43 +252,47 @@ void frame() {
     }
     queue.WriteBuffer(ubo, 0, shaderData.data(), numTriangles * sizeof(ShaderData));
 
-    wgpu::RenderPassColorAttachment attachment{};
-    attachment.view = view;
-    attachment.loadOp = wgpu::LoadOp::Clear;
-    attachment.storeOp = wgpu::StoreOp::Store;
-    attachment.clearValue = {0, 0, 0, 1};
+    bool renderedInJS = renderInJSIfEnabled(device.Get(), view.Get(), pipeline.Get(), bindGroup.Get(), numTriangles, sizeof(ShaderData));
+    if (!renderedInJS) {
+        wgpu::RenderPassColorAttachment attachment{};
+        attachment.view = view;
+        attachment.loadOp = wgpu::LoadOp::Clear;
+        attachment.storeOp = wgpu::StoreOp::Store;
+        attachment.clearValue = {0, 0, 0, 1};
 
-    wgpu::RenderPassDescriptor renderpass{};
-    renderpass.colorAttachmentCount = 1;
-    renderpass.colorAttachments = &attachment;
+        wgpu::RenderPassDescriptor renderpass{};
+        renderpass.colorAttachmentCount = 1;
+        renderpass.colorAttachments = &attachment;
 
-    wgpu::CommandBuffer commands;
-    {
-        wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+        wgpu::CommandBuffer commands;
         {
-            wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
-            pass.SetPipeline(pipeline);
-            for (size_t i = 0; i < numTriangles; i++) {
-                uint32_t offset = i * sizeof(ShaderData);
-                pass.SetBindGroup(0, bindGroup, 1, &offset);
-                pass.Draw(3);
+            wgpu::CommandEncoder encoder = device.CreateCommandEncoder();
+            {
+                wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
+                pass.SetPipeline(pipeline);
+                for (size_t i = 0; i < numTriangles; i++) {
+                    uint32_t offset = i * sizeof(ShaderData);
+                    pass.SetBindGroup(0, bindGroup, 1, &offset);
+                    pass.Draw(3);
+                }
+                pass.End();
             }
-            pass.End();
+            commands = encoder.Finish();
         }
-        commands = encoder.Finish();
+
+        queue.Submit(1, &commands);
     }
 
-    queue.Submit(1, &commands);
-
     auto t = std::chrono::high_resolution_clock::now();
-    if (frameCount == 0) {
+    if (frameCount == 0 || renderedInJS != lastRenderedInJS) {
         t0 = t;
     } else {
         double micros = std::chrono::duration_cast<std::chrono::microseconds>(t - t0).count();
         // Print stats every 2s
         if (micros > 2'000'000) {
             double avg = micros / (frameCount - lastTimePrint);
-            printf("average frame time (refresh rate limited), %zu triangles: %.1fms (%.1f FPS)\n",
+            printf("average frame time (refresh rate limited), %s, %zu triangles: %.1fms (%.1f FPS)\n",
+                renderedInJS ? "JS" : "Wasm",
                 numTriangles, avg / 1000, 1'000'000 / avg);
 
             t0 = t;
@@ -263,6 +300,7 @@ void frame() {
         }
     }
 
+    lastRenderedInJS = renderedInJS;
     frameCount++;
 }
 
@@ -288,6 +326,15 @@ void run() {
 }
 
 int main() {
+    EM_ASM({
+        const label = document.createElement('label');
+        document.body.append(label);
+
+        globalThis.jsModeCheckbox = document.createElement('input');
+        jsModeCheckbox.type = 'checkbox';
+        label.append(jsModeCheckbox);
+        label.append('Render using JS (unchecked = Wasm)');
+    });
     numTriangles = EM_ASM_INT({
         const triangles = new URLSearchParams(window.location.search).get('triangles');
         if (!triangles) {
