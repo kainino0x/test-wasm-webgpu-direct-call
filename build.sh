@@ -2,7 +2,7 @@
 set -euo pipefail
 
 FLAGS=()
-FLAGS+=(--shell-file=shell.html)
+FLAGS+=(--shell-file=shell.html.txt)
 #FLAGS+=(-O0 -g)
 FLAGS+=(-O3 -g2) # -g2 should not add any WASM overhead but keep unminified JS
 #FLAGS+=(-flto) # FIXME: -flto not working with reference types: "invalid relocation data index"

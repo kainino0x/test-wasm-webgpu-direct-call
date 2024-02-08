@@ -113,10 +113,7 @@ void init() {
     }
 }
 
-EM_JS(bool, renderInJSIfEnabled, (WGPURenderPassEncoder passId, WGPURenderPipeline pipelineId, uint32_t iterationCount), {
-    if (!jsModeCheckbox.checked) {
-        return false;
-    }
+EM_JS(void, renderInJS, (WGPURenderPassEncoder passId, WGPURenderPipeline pipelineId, uint32_t iterationCount), {
     const pass = WebGPU.mgrRenderPassEncoder.get(passId);
     const pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
 
@@ -124,8 +121,6 @@ EM_JS(bool, renderInJSIfEnabled, (WGPURenderPassEncoder passId, WGPURenderPipeli
         pass.setPipeline(pipeline);
         pass.draw(3);
     }
-
-    return true;
 });
 
 void render(wgpu::TextureView view) {
@@ -145,7 +140,7 @@ void render(wgpu::TextureView view) {
         {
             wgpu::RenderPassEncoder pass = encoder.BeginRenderPass(&renderpass);
             WGPURenderPassEncoder cPass = pass.Get();
-            printf("pass id = %zu\n", reinterpret_cast<uintptr_t>(cPass));
+            WGPURenderPipeline cPipeline = pipeline.Get();
 
             auto t0 = std::chrono::high_resolution_clock::now();
 
@@ -183,19 +178,40 @@ void render(wgpu::TextureView view) {
             const char* description = "Draw";
             pass.SetPipeline(pipeline);
             for (uint32_t i = 0; i < iterationCount; ++i) {
-                pass.Draw(3);
+                wgpuRenderPassEncoderDraw_NoJS(cPass, 3, 1, 0, 0);
             }
 #elif BENCH_MODE_SET_DRAW
             const char* description = nullptr;
-            bool renderedInJS = renderInJSIfEnabled(pass.Get(), pipeline.Get(), iterationCount);
-            if (renderedInJS) {
-                description = "SetPipeline+Draw (JS)";
-            } else {
-                description = "SetPipeline+Draw (Wasm)";
-                for (uint32_t i = 0; i < iterationCount; ++i) {
-                    pass.SetPipeline(pipeline);
-                    pass.Draw(3);
-                }
+            int mode = EM_ASM_INT({ return modeSelect.value; });
+            switch (mode) {
+                case 1:
+                    description = "SetPipeline+Draw, mode=1";
+                    renderInJS(pass.Get(), pipeline.Get(), iterationCount);
+                    break;
+                case 2:
+                    description = "SetPipeline+Draw, mode=2";
+                    for (uint32_t i = 0; i < iterationCount; ++i) {
+                        wgpuRenderPassEncoderSetPipeline(cPass, cPipeline);
+                        wgpuRenderPassEncoderDraw(cPass, 3, 1, 0, 0);
+                        pass.Draw(3);
+                    }
+                    break;
+                case 3:
+                    description = "SetPipeline+Draw, mode=3";
+                    for (uint32_t i = 0; i < iterationCount; ++i) {
+                        wgpuRenderPassEncoderSetPipeline(cPass, cPipeline);
+                        wgpuRenderPassEncoderDraw_NoJS(cPass, 3, 1, 0, 0);
+                        pass.Draw(3);
+                    }
+                    break;
+                case 4:
+                    description = "SetPipeline+Draw, mode=4";
+                    for (uint32_t i = 0; i < iterationCount; ++i) {
+                        wgpuRenderPassEncoderSetPipeline(cPass, cPipeline);
+                        wgpuRenderPassEncoderDraw_JSByExternref(cPass, 3, 1, 0, 0);
+                        pass.Draw(3);
+                    }
+                    break;
             }
 #else
 #    error "Bench mode not set"
@@ -247,20 +263,27 @@ void run() {
 int main() {
 #if BENCH_MODE_SET_DRAW
     EM_ASM({
-        const label = document.createElement('label');
-        document.body.append(label);
-
-        globalThis.jsModeCheckbox = document.createElement('input');
-        jsModeCheckbox.type = 'checkbox';
-        label.append(jsModeCheckbox);
-        label.append('Render using JS (unchecked = Wasm)');
+        optionsDiv.innerHTML = `
+            <label>
+                Select a mode:
+                <select id="modeSelect">
+                    <option value=1>Render using JS
+                    <option value=2>Render using Wasm "JSByIndex" (classic)
+                    <option value=3 selected>Render using Wasm "NoJS"
+                    <option value=4>Render using Wasm "JSByExternref"
+                </select>
+            </label>
+        `;
     });
 #endif
     iterationCount = EM_ASM_INT({
-        const iterations = new URLSearchParams(window.location.search).get('iterations');
+        const url = new URL(window.location.href);
+        const iterations = url.searchParams.get('iterations');
         if (!iterations) {
-            // Redirect
-            window.location.search = '?iterations=10000000';
+            // Rewrite the url
+            const url = new URL(window.location.href);
+            url.searchParams.set('iterations', '10000000');
+            window.location.replace(url.href);
         }
         return iterations;
     });

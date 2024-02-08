@@ -328,10 +328,10 @@ function createWasm() {
  };
  /** @param {WebAssembly.Module=} module*/ function receiveInstance(instance, module) {
   wasmExports = instance.exports;
-  wasmMemory = wasmExports["fa"];
+  wasmMemory = wasmExports["ka"];
   updateMemoryViews();
-  wasmTable = wasmExports["ha"];
-  addOnInit(wasmExports["ga"]);
+  wasmTable = wasmExports["ma"];
+  addOnInit(wasmExports["la"]);
   removeRunDependency("wasm-instantiate");
   return wasmExports;
  }
@@ -356,28 +356,24 @@ var tempDouble;
 var tempI64;
 
 var ASM_CONSTS = {
- 4953: () => {
-  const label = document.createElement("label");
-  document.body.append(label);
-  globalThis.jsModeCheckbox = document.createElement("input");
-  jsModeCheckbox.type = "checkbox";
-  label.append(jsModeCheckbox);
-  label.append("Render using JS (unchecked = Wasm)");
+ 4893: () => modeSelect.value,
+ 4922: () => {
+  optionsDiv.innerHTML = ` <label> Select a mode: <select id="modeSelect"> <option value=1>Render using JS <option value=2>Render using Wasm "JSByIndex" (classic) <option value=3 selected>Render using Wasm "NoJS" <option value=4>Render using Wasm "JSByExternref" </select> </label> `;
   globalThis.dynamicOffsetArrayForJS = new Uint32Array(1);
  },
- 5267: () => {
-  const triangles = new URLSearchParams(window.location.search).get("triangles");
+ 5266: () => {
+  const url = new URL(window.location.href);
+  const triangles = url.searchParams.get("triangles");
   if (!triangles) {
-   window.location.search = "?triangles=100000";
+   const url = new URL(window.location.href);
+   url.searchParams.set("triangles", "1000000");
+   window.location.replace(url.href);
   }
   return triangles;
  }
 };
 
-function renderInJSIfEnabled(passId, bindGroupId, numTriangles, sizeofShaderData) {
- if (!jsModeCheckbox.checked) {
-  return false;
- }
+function renderInJS(passId, bindGroupId, numTriangles, sizeofShaderData) {
  const pass = WebGPU.mgrRenderPassEncoder.get(passId);
  const bindGroup = WebGPU.mgrBindGroup.get(bindGroupId);
  for (let i = 0; i < numTriangles; ++i) {
@@ -385,7 +381,6 @@ function renderInJSIfEnabled(passId, bindGroupId, numTriangles, sizeofShaderData
   pass.setBindGroup(0, bindGroup, dynamicOffsetArrayForJS, 0, 1);
   pass.draw(3);
  }
- return true;
 }
 
 /** @constructor */ function ExitStatus(status) {
@@ -1829,13 +1824,23 @@ var _emwgpuDeviceCreateRenderPipeline = (deviceId, descriptor, idOutPtr) => {
 
 var _emwgpuGetHEAPU32 = () => HEAPU32;
 
-var _emwgpuRenderPassEncoderDraw = Function.prototype.call.bind(GPURenderPassEncoder.prototype.draw);
+var _emwgpuRenderPassEncoderDraw_JSByExternref = (pass, vertexCount, instanceCount, firstVertex, firstInstance) => {
+ pass["draw"](vertexCount, instanceCount, firstVertex, firstInstance);
+};
 
-var _emwgpuRenderPassEncoderSetBindGroupWithOffsets = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setBindGroup);
+var _emwgpuRenderPassEncoderDraw_NoJS = Function.prototype.call.bind(GPURenderPassEncoder.prototype.draw);
 
-var _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setBindGroup);
+var _emwgpuRenderPassEncoderSetBindGroupWithOffsets_JSByExternref = (pass, groupIndex, group, heapu32, dynamicOffsetsPtr, dynamicOffsetCount) => {
+ pass["setBindGroup"](groupIndex, group, heapu32, dynamicOffsetsPtr, dynamicOffsetCount);
+};
 
-var _emwgpuRenderPassEncoderSetPipeline = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setPipeline);
+var _emwgpuRenderPassEncoderSetBindGroupWithOffsets_NoJS = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setBindGroup);
+
+var _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets_JSByExternref = (pass, groupIndex, group) => {
+ pass["setBindGroup"](groupIndex, group);
+};
+
+var _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets_NoJS = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setBindGroup);
 
 var printCharBuffers = [ null, [], [] ];
 
@@ -2252,12 +2257,33 @@ function _wgpuQueueWriteBuffer(queueId, bufferId, bufferOffset_low, bufferOffset
  queue["writeBuffer"](buffer, bufferOffset, subarray, 0, size);
 }
 
+var _wgpuRenderPassEncoderDraw = (passId, vertexCount, instanceCount, firstVertex, firstInstance) => {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ pass["draw"](vertexCount, instanceCount, firstVertex, firstInstance);
+};
+
 var _wgpuRenderPassEncoderEnd = encoderId => {
  var encoder = WebGPU.mgrRenderPassEncoder.get(encoderId);
  encoder["end"]();
 };
 
 var _wgpuRenderPassEncoderRelease = id => WebGPU.mgrRenderPassEncoder.release(id);
+
+var _wgpuRenderPassEncoderSetBindGroup = (passId, groupIndex, groupId, dynamicOffsetCount, dynamicOffsetsPtr) => {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ var group = WebGPU.mgrBindGroup.get(groupId);
+ if (dynamicOffsetCount == 0) {
+  pass["setBindGroup"](groupIndex, group);
+ } else {
+  pass["setBindGroup"](groupIndex, group, HEAPU32, ((dynamicOffsetsPtr) >> 2), dynamicOffsetCount);
+ }
+};
+
+var _wgpuRenderPassEncoderSetPipeline = (passId, pipelineId) => {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ var pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+ pass["setPipeline"](pipeline);
+};
 
 var _wgpuRenderPipelineRelease = id => WebGPU.mgrRenderPipeline.release(id);
 
@@ -2353,53 +2379,58 @@ WebGPU.initManagers();
 var wasmImports = {
  /** @export */ a: ___assert_fail,
  /** @export */ e: ___cxa_throw,
- /** @export */ ea: __emscripten_get_now_is_monotonic,
+ /** @export */ ja: __emscripten_get_now_is_monotonic,
  /** @export */ c: _abort,
  /** @export */ b: _emscripten_asm_const_int,
- /** @export */ da: _emscripten_get_now,
- /** @export */ ca: _emscripten_memcpy_js,
- /** @export */ ba: _emscripten_resize_heap,
- /** @export */ aa: _emscripten_set_main_loop,
- /** @export */ $: _emwgpuCommandEncoderBeginRenderPass,
- /** @export */ _: _emwgpuDeviceCreateBindGroup,
- /** @export */ Z: _emwgpuDeviceCreateRenderPipeline,
- /** @export */ Y: _emwgpuGetHEAPU32,
- /** @export */ X: _emwgpuRenderPassEncoderDraw,
- /** @export */ W: _emwgpuRenderPassEncoderSetBindGroupWithOffsets,
- /** @export */ V: _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets,
- /** @export */ U: _emwgpuRenderPassEncoderSetPipeline,
+ /** @export */ ia: _emscripten_get_now,
+ /** @export */ ha: _emscripten_memcpy_js,
+ /** @export */ ga: _emscripten_resize_heap,
+ /** @export */ fa: _emscripten_set_main_loop,
+ /** @export */ ea: _emwgpuCommandEncoderBeginRenderPass,
+ /** @export */ da: _emwgpuDeviceCreateBindGroup,
+ /** @export */ ca: _emwgpuDeviceCreateRenderPipeline,
+ /** @export */ ba: _emwgpuGetHEAPU32,
+ /** @export */ aa: _emwgpuRenderPassEncoderDraw_JSByExternref,
+ /** @export */ $: _emwgpuRenderPassEncoderDraw_NoJS,
+ /** @export */ _: _emwgpuRenderPassEncoderSetBindGroupWithOffsets_JSByExternref,
+ /** @export */ Z: _emwgpuRenderPassEncoderSetBindGroupWithOffsets_NoJS,
+ /** @export */ Y: _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets_JSByExternref,
+ /** @export */ X: _emwgpuRenderPassEncoderSetBindGroupWithoutOffsets_NoJS,
  /** @export */ d: _fd_write,
- /** @export */ S: renderInJSIfEnabled,
- /** @export */ R: _wgpuAdapterRelease,
- /** @export */ Q: _wgpuAdapterRequestDevice,
- /** @export */ P: _wgpuBindGroupLayoutReference,
- /** @export */ O: _wgpuBindGroupLayoutRelease,
- /** @export */ N: _wgpuBindGroupRelease,
- /** @export */ M: _wgpuBufferReference,
- /** @export */ L: _wgpuBufferRelease,
- /** @export */ K: _wgpuCommandBufferRelease,
- /** @export */ J: _wgpuCommandEncoderFinish,
- /** @export */ I: _wgpuCommandEncoderRelease,
- /** @export */ H: _wgpuDeviceCreateBindGroupLayout,
- /** @export */ G: _wgpuDeviceCreateBuffer,
- /** @export */ F: _wgpuDeviceCreateCommandEncoder,
- /** @export */ E: _wgpuDeviceCreatePipelineLayout,
- /** @export */ D: _wgpuDeviceCreateShaderModule,
- /** @export */ C: _wgpuDeviceCreateSwapChain,
- /** @export */ B: _wgpuDeviceGetQueue,
- /** @export */ A: _wgpuDeviceReference,
- /** @export */ z: _wgpuDeviceRelease,
- /** @export */ y: _wgpuDeviceSetUncapturedErrorCallback,
- /** @export */ x: _wgpuInstanceCreateSurface,
- /** @export */ w: _wgpuInstanceRequestAdapter,
- /** @export */ v: _wgpuPipelineLayoutReference,
- /** @export */ u: _wgpuPipelineLayoutRelease,
- /** @export */ t: _wgpuQuerySetRelease,
- /** @export */ s: _wgpuQueueRelease,
- /** @export */ r: _wgpuQueueSubmit,
- /** @export */ T: _wgpuQueueWriteBuffer,
- /** @export */ q: _wgpuRenderPassEncoderEnd,
- /** @export */ p: _wgpuRenderPassEncoderRelease,
+ /** @export */ V: renderInJS,
+ /** @export */ U: _wgpuAdapterRelease,
+ /** @export */ T: _wgpuAdapterRequestDevice,
+ /** @export */ S: _wgpuBindGroupLayoutReference,
+ /** @export */ R: _wgpuBindGroupLayoutRelease,
+ /** @export */ Q: _wgpuBindGroupRelease,
+ /** @export */ P: _wgpuBufferReference,
+ /** @export */ O: _wgpuBufferRelease,
+ /** @export */ N: _wgpuCommandBufferRelease,
+ /** @export */ M: _wgpuCommandEncoderFinish,
+ /** @export */ L: _wgpuCommandEncoderRelease,
+ /** @export */ K: _wgpuDeviceCreateBindGroupLayout,
+ /** @export */ J: _wgpuDeviceCreateBuffer,
+ /** @export */ I: _wgpuDeviceCreateCommandEncoder,
+ /** @export */ H: _wgpuDeviceCreatePipelineLayout,
+ /** @export */ G: _wgpuDeviceCreateShaderModule,
+ /** @export */ F: _wgpuDeviceCreateSwapChain,
+ /** @export */ E: _wgpuDeviceGetQueue,
+ /** @export */ D: _wgpuDeviceReference,
+ /** @export */ C: _wgpuDeviceRelease,
+ /** @export */ B: _wgpuDeviceSetUncapturedErrorCallback,
+ /** @export */ A: _wgpuInstanceCreateSurface,
+ /** @export */ z: _wgpuInstanceRequestAdapter,
+ /** @export */ y: _wgpuPipelineLayoutReference,
+ /** @export */ x: _wgpuPipelineLayoutRelease,
+ /** @export */ w: _wgpuQuerySetRelease,
+ /** @export */ v: _wgpuQueueRelease,
+ /** @export */ u: _wgpuQueueSubmit,
+ /** @export */ W: _wgpuQueueWriteBuffer,
+ /** @export */ t: _wgpuRenderPassEncoderDraw,
+ /** @export */ s: _wgpuRenderPassEncoderEnd,
+ /** @export */ r: _wgpuRenderPassEncoderRelease,
+ /** @export */ q: _wgpuRenderPassEncoderSetBindGroup,
+ /** @export */ p: _wgpuRenderPassEncoderSetPipeline,
  /** @export */ o: _wgpuRenderPipelineRelease,
  /** @export */ n: _wgpuSamplerRelease,
  /** @export */ m: _wgpuShaderModuleGetCompilationInfo,
@@ -2414,27 +2445,27 @@ var wasmImports = {
 
 var wasmExports = createWasm();
 
-var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["ga"])();
+var ___wasm_call_ctors = () => (___wasm_call_ctors = wasmExports["la"])();
 
-var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["ia"])(a0, a1);
+var _main = Module["_main"] = (a0, a1) => (_main = Module["_main"] = wasmExports["na"])(a0, a1);
 
-var _malloc = a0 => (_malloc = wasmExports["ja"])(a0);
+var _malloc = a0 => (_malloc = wasmExports["oa"])(a0);
 
-var _free = a0 => (_free = wasmExports["ka"])(a0);
+var _free = a0 => (_free = wasmExports["pa"])(a0);
 
 var _memalign = (a0, a1) => (_memalign = wasmExports["memalign"])(a0, a1);
 
-var stackSave = () => (stackSave = wasmExports["la"])();
+var stackSave = () => (stackSave = wasmExports["qa"])();
 
-var stackRestore = a0 => (stackRestore = wasmExports["ma"])(a0);
+var stackRestore = a0 => (stackRestore = wasmExports["ra"])(a0);
 
-var stackAlloc = a0 => (stackAlloc = wasmExports["na"])(a0);
+var stackAlloc = a0 => (stackAlloc = wasmExports["sa"])(a0);
 
-var ___cxa_is_pointer_type = a0 => (___cxa_is_pointer_type = wasmExports["oa"])(a0);
+var ___cxa_is_pointer_type = a0 => (___cxa_is_pointer_type = wasmExports["ta"])(a0);
 
 var ___start_em_js = Module["___start_em_js"] = 4500;
 
-var ___stop_em_js = Module["___stop_em_js"] = 4953;
+var ___stop_em_js = Module["___stop_em_js"] = 4893;
 
 var calledRun;
 

@@ -356,10 +356,13 @@ var tempDouble;
 var tempI64;
 
 var ASM_CONSTS = {
- 2886: () => {
-  const iterations = new URLSearchParams(window.location.search).get("iterations");
+ 2810: () => {
+  const url = new URL(window.location.href);
+  const iterations = url.searchParams.get("iterations");
   if (!iterations) {
-   window.location.search = "?iterations=10000000";
+   const url = new URL(window.location.href);
+   url.searchParams.set("iterations", "10000000");
+   window.location.replace(url.href);
   }
   return iterations;
  }
@@ -1741,9 +1744,7 @@ var _emwgpuDeviceCreateRenderPipeline = (deviceId, descriptor, idOutPtr) => {
 
 var _emwgpuGetHEAPU32 = () => HEAPU32;
 
-var _emwgpuRenderPassEncoderDraw = Function.prototype.call.bind(GPURenderPassEncoder.prototype.draw);
-
-var _emwgpuRenderPassEncoderSetPipeline = Function.prototype.call.bind(GPURenderPassEncoder.prototype.setPipeline);
+var _emwgpuRenderPassEncoderDraw_NoJS = Function.prototype.call.bind(GPURenderPassEncoder.prototype.draw);
 
 var printCharBuffers = [ null, [], [] ];
 
@@ -2131,6 +2132,12 @@ var _wgpuRenderPassEncoderEnd = encoderId => {
 
 var _wgpuRenderPassEncoderRelease = id => WebGPU.mgrRenderPassEncoder.release(id);
 
+var _wgpuRenderPassEncoderSetPipeline = (passId, pipelineId) => {
+ var pass = WebGPU.mgrRenderPassEncoder.get(passId);
+ var pipeline = WebGPU.mgrRenderPipeline.get(pipelineId);
+ pass["setPipeline"](pipeline);
+};
+
 var _wgpuRenderPipelineRelease = id => WebGPU.mgrRenderPipeline.release(id);
 
 var _wgpuShaderModuleGetCompilationInfo = (shaderModuleId, callback, userdata) => {
@@ -2233,34 +2240,34 @@ var wasmImports = {
  /** @export */ O: _emwgpuDeviceCreateBindGroup,
  /** @export */ N: _emwgpuDeviceCreateRenderPipeline,
  /** @export */ M: _emwgpuGetHEAPU32,
- /** @export */ L: _emwgpuRenderPassEncoderDraw,
- /** @export */ K: _emwgpuRenderPassEncoderSetPipeline,
+ /** @export */ L: _emwgpuRenderPassEncoderDraw_NoJS,
  /** @export */ b: _fd_write,
- /** @export */ J: _wgpuAdapterRelease,
- /** @export */ I: _wgpuAdapterRequestDevice,
- /** @export */ H: _wgpuBindGroupLayoutReference,
- /** @export */ G: _wgpuBindGroupLayoutRelease,
- /** @export */ F: _wgpuBindGroupRelease,
- /** @export */ E: _wgpuCommandBufferRelease,
- /** @export */ D: _wgpuCommandEncoderFinish,
- /** @export */ C: _wgpuCommandEncoderRelease,
- /** @export */ B: _wgpuDeviceCreateBindGroupLayout,
- /** @export */ A: _wgpuDeviceCreateCommandEncoder,
- /** @export */ z: _wgpuDeviceCreatePipelineLayout,
- /** @export */ y: _wgpuDeviceCreateShaderModule,
- /** @export */ x: _wgpuDeviceCreateSwapChain,
- /** @export */ w: _wgpuDeviceGetQueue,
- /** @export */ v: _wgpuDeviceReference,
- /** @export */ u: _wgpuDeviceRelease,
- /** @export */ t: _wgpuDeviceSetUncapturedErrorCallback,
- /** @export */ s: _wgpuInstanceCreateSurface,
- /** @export */ r: _wgpuInstanceRequestAdapter,
- /** @export */ q: _wgpuPipelineLayoutRelease,
- /** @export */ p: _wgpuQuerySetRelease,
- /** @export */ o: _wgpuQueueRelease,
- /** @export */ n: _wgpuQueueSubmit,
- /** @export */ m: _wgpuRenderPassEncoderEnd,
- /** @export */ l: _wgpuRenderPassEncoderRelease,
+ /** @export */ K: _wgpuAdapterRelease,
+ /** @export */ J: _wgpuAdapterRequestDevice,
+ /** @export */ I: _wgpuBindGroupLayoutReference,
+ /** @export */ H: _wgpuBindGroupLayoutRelease,
+ /** @export */ G: _wgpuBindGroupRelease,
+ /** @export */ F: _wgpuCommandBufferRelease,
+ /** @export */ E: _wgpuCommandEncoderFinish,
+ /** @export */ D: _wgpuCommandEncoderRelease,
+ /** @export */ C: _wgpuDeviceCreateBindGroupLayout,
+ /** @export */ B: _wgpuDeviceCreateCommandEncoder,
+ /** @export */ A: _wgpuDeviceCreatePipelineLayout,
+ /** @export */ z: _wgpuDeviceCreateShaderModule,
+ /** @export */ y: _wgpuDeviceCreateSwapChain,
+ /** @export */ x: _wgpuDeviceGetQueue,
+ /** @export */ w: _wgpuDeviceReference,
+ /** @export */ v: _wgpuDeviceRelease,
+ /** @export */ u: _wgpuDeviceSetUncapturedErrorCallback,
+ /** @export */ t: _wgpuInstanceCreateSurface,
+ /** @export */ s: _wgpuInstanceRequestAdapter,
+ /** @export */ r: _wgpuPipelineLayoutRelease,
+ /** @export */ q: _wgpuQuerySetRelease,
+ /** @export */ p: _wgpuQueueRelease,
+ /** @export */ o: _wgpuQueueSubmit,
+ /** @export */ n: _wgpuRenderPassEncoderEnd,
+ /** @export */ m: _wgpuRenderPassEncoderRelease,
+ /** @export */ l: _wgpuRenderPassEncoderSetPipeline,
  /** @export */ k: _wgpuRenderPipelineRelease,
  /** @export */ j: _wgpuShaderModuleGetCompilationInfo,
  /** @export */ i: _wgpuShaderModuleReference,
@@ -2290,9 +2297,9 @@ var stackRestore = a0 => (stackRestore = wasmExports["ca"])(a0);
 
 var stackAlloc = a0 => (stackAlloc = wasmExports["da"])(a0);
 
-var ___start_em_js = Module["___start_em_js"] = 2532;
+var ___start_em_js = Module["___start_em_js"] = 2516;
 
-var ___stop_em_js = Module["___stop_em_js"] = 2886;
+var ___stop_em_js = Module["___stop_em_js"] = 2810;
 
 var calledRun;
 

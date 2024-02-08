@@ -356,10 +356,13 @@ var tempDouble;
 var tempI64;
 
 var ASM_CONSTS = {
- 2918: () => {
-  const iterations = new URLSearchParams(window.location.search).get("iterations");
+ 2842: () => {
+  const url = new URL(window.location.href);
+  const iterations = url.searchParams.get("iterations");
   if (!iterations) {
-   window.location.search = "?iterations=10000000";
+   const url = new URL(window.location.href);
+   url.searchParams.set("iterations", "10000000");
+   window.location.replace(url.href);
   }
   return iterations;
  }
@@ -2287,9 +2290,9 @@ var stackRestore = a0 => (stackRestore = wasmExports["ba"])(a0);
 
 var stackAlloc = a0 => (stackAlloc = wasmExports["ca"])(a0);
 
-var ___start_em_js = Module["___start_em_js"] = 2564;
+var ___start_em_js = Module["___start_em_js"] = 2548;
 
-var ___stop_em_js = Module["___stop_em_js"] = 2918;
+var ___stop_em_js = Module["___stop_em_js"] = 2842;
 
 var calledRun;
 
