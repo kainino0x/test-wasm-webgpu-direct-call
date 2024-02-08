@@ -282,7 +282,7 @@ int main() {
         if (!iterations) {
             // Rewrite the url
             const url = new URL(window.location.href);
-            url.searchParams.set('iterations', '10000000');
+            url.searchParams.set('iterations', '1000000');
             window.location.replace(url.href);
         }
         return iterations;
